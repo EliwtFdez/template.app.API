@@ -1,3 +1,6 @@
+using element._118.app.API.Context;
+using Microsoft.EntityFrameworkCore;
+
 namespace element._118.app.API
 {
     public class Program
@@ -7,12 +10,22 @@ namespace element._118.app.API
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddCors(option =>
+            {
+                option.AddPolicy("MyPolicy", builder =>
+                {
+                    builder.AllowAnyOrigin()
+                    .AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+                });
+             });
 
+            // Register AppDbContext with DI
+            builder.Services.AddDbContext<AppDbContext>(options => { options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServerConnStr"));});
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -23,12 +36,11 @@ namespace element._118.app.API
             }
 
             app.UseHttpsRedirection();
-
+            app.UseAuthentication();
             app.UseAuthorization();
-
+            app.UseCors("MyPolicy");
 
             app.MapControllers();
-
             app.Run();
         }
     }
