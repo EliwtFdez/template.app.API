@@ -3,6 +3,9 @@ using element._118.app.API.Helpers;
 using element._118.app.API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -35,8 +38,12 @@ namespace element._118.app.API.Controllers
             if (!PasswordHasher.VerifyPassword(userObj.Password, user.Password))
                 return BadRequest(new { Message = "Password is incorrect" });
 
+            user.Token = CreateJwt(user);
+
             // If the username and password match, return a success message
-            return Ok(new { Message = "Login Success!" });
+            return Ok(new {Token = user.Token, Message = "Login Success!" });
+
+
         }
 
         [HttpPost("Register")]
@@ -63,7 +70,10 @@ namespace element._118.app.API.Controllers
             return Ok(new { Message = "User registered successfully!" });
         }
 
-        // Change the return type from object to string
+        private Task<bool> CheckUserNameExistAsync(string username) => _authContext.Users.AnyAsync(x => x.Username == username);
+        
+        private Task<bool> CheckEmailExistAsync(string email) => _authContext.Users.AnyAsync(x => x.Email == email);
+        
         private string CheckPasswordStrength(string password)
         {
             StringBuilder sb = new StringBuilder();
@@ -83,7 +93,30 @@ namespace element._118.app.API.Controllers
             return sb.ToString();
         }
 
-        private Task<bool> CheckUserNameExistAsync(string username) => _authContext.Users.AnyAsync(x => x.Username == username);
-        private Task<bool> CheckEmailExistAsync(string email) => _authContext.Users.AnyAsync(x => x.Email == email);
+        private string CreateJwt(User user)
+        {
+            var jwtTokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes("aGVsbG9Ub0NoYXQxMjM0NTY3ODkwaGVsbG9Ub0NoYXQ=");
+            var identity = new ClaimsIdentity(new Claim[]
+            {
+            new Claim(ClaimTypes.Role, user.Role),
+            new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
+            });
+
+            var credential = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
+
+            var tokenDescription = new SecurityTokenDescriptor
+            {
+                Subject = identity,
+                Expires = DateTime.Now.AddDays(7),
+                SigningCredentials = credential
+            };
+
+            var token = jwtTokenHandler.CreateToken(tokenDescription);
+            return jwtTokenHandler.WriteToken(token);
+        }
+
+
     }
+
 }
